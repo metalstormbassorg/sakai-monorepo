@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org">
+<body>
+<script th:fragment="wizardJs" th:inline="javascript">
+  /*<![CDATA[*/
+  var groupManager = groupManager || {};
+
+  groupManager.previousWizardStep = step => {
+
+    const wizardAction = document.getElementById("wizardAction");
+    if (wizardAction) {
+      wizardAction.value = step;
+      document.querySelector(".autogroups-wizard-form").submit();
+    }
+  };
+  /*]]>*/
+</script>
+<script th:fragment="indexJs" th:inline="javascript">
+  /*<![CDATA[*/
+
+  var groupManager = groupManager || {};
+
+  groupManager.checkSubmitButton = () => {
+
+    const anyCheckboxEnabled = 
+      document.querySelectorAll(".group-manager-delete-checkbox:checked").length > 0;
+
+    const submitButton = document.getElementById("delete-groups-submit-button");
+    submitButton && (submitButton.disabled = !anyCheckboxEnabled);
+  };
+
+  const gmCancelButton = document.getElementById("delete-groups-cancel-button");
+  gmCancelButton && gmCancelButton.addEventListener("click", e => {
+
+    e.preventDefault;
+    window.location = window.location.href.replace("/sakai-site-group-manager.helper", "");
+  });
+
+  const gmSelectAllCheckbox = document.getElementById("group-manager-index-select-all");
+  gmSelectAllCheckbox && gmSelectAllCheckbox.addEventListener("click", e => {
+
+    document.querySelectorAll(".group-manager-delete-checkbox")
+      .forEach(box => box.checked = e.target.checked);
+    const submitButton = document.getElementById("delete-groups-submit-button");
+    submitButton && (submitButton.disabled = !e.target.checked);
+  });
+
+  document.querySelectorAll(".group-manager-delete-checkbox").forEach(box => {
+
+      box.addEventListener("click", e => {
+        if (!e.target.checked) gmSelectAllCheckbox.checked = false;
+      });
+  });
+
+  const gmForm = document.getElementById("group-manager-form");
+  gmForm && gmForm.addEventListener("submit", e => {
+
+    e.preventDefault();
+    $('#confirmation-modal').modal('show');
+    const deletedGroupsList = document.getElementById("deleted-groups-list");
+    deletedGroupsList.innerHTML = "";
+    document.querySelectorAll(".group-manager-delete-checkbox:checked")
+      .forEach(box => deletedGroupsList.innerHTML += `<li>${box.getAttribute("groupinfo")}</li>`);
+  });
+
+  const gmConfirm = document.getElementById("modal-btn-confirm");
+  gmConfirm && gmConfirm.addEventListener("click", () => {
+
+    gmForm && gmForm.submit();
+    $('#confirmation-modal').modal('hide');
+  });
+
+  const cancel = document.getElementById("modal-btn-cancel");
+  cancel && cancel.addEventListener("click", () => {
+    $('#confirmation-modal').modal('hide');
+  });
+
+  /*]]>*/
+</script>
+
+<script th:fragment="joinableSetJs" th:inline="javascript">
+  /*<![CDATA[*/
+  $(document).ready(function() {
+
+    //Disable the submit button
+    const submitButton = document.getElementById("create-joinableset-submit-button");
+    submitButton && (submitButton.disabled = true);
+
+    const groupTitle = document.getElementById("groupTitle");
+    const groupNumber = document.getElementById("groupNumber");
+    const groupMaxMembers = document.getElementById("groupMaxMembers");
+
+    //Enable or disable the submit button depending on the required fields
+    [groupTitle, groupNumber, groupMaxMembers].forEach(field => {
+
+      field.addEventListener("keyup", () => {
+
+        document.querySelectorAll('#createnewjoinableset-form input[type="submit"]').forEach(submit => {
+            submit.disabled = !groupTitle.value || groupNumber.value <= 0 || groupMaxMembers.value <= 0;
+        });
+      });
+    });
+  });
+
+  var confirmationModal = function (callback) {
+
+    const deleteButton = document.getElementById("delete-joinableset-submit-button");
+    deleteButton && deleteButton.addEventListener("click", e => {
+
+      e.preventDefault();
+      $('#confirmation-modal').modal('show');
+    });
+
+    const confirmButton = document.getElementById("modal-btn-confirm");
+    confirmButton && confirmButton.addEventListener("click", () => {
+
+      $('#confirmation-modal').modal('hide');
+      window.location.replace(deleteButton.getAttribute("href"));
+    });
+
+    const cancelButton = document.getElementById("modal-btn-cancel");
+    cancelButton && cancelButton.addEventListener("click", () => {
+
+      callback(false);
+      $('#confirmation-modal').modal('hide');
+   });
+  };
+
+  confirmationModal(function (confirm) {
+    if (confirm) {
+      document.getElementById('group-manager-form').submit();
+    }
+  });
+/*]]>*/
+</script>
+
+<script th:fragment="groupJs" th:inline="javascript">
+  /*<![CDATA[*/
+  // Load the select2 library
+  includeWebjarLibrary('select2');
+
+  $(document).ready(function() {
+    // Initialize popovers
+    $('[data-toggle="popover"]').popover();
+
+    const groupTitle = document.getElementById("groupTitle");
+
+    //Disable or enable the submit depending on the group title value.
+    const submitButton = document.getElementById("create-group-submit-button");
+    submitButton && (submitButton.disabled = !groupTitle?.value);
+
+    //Enable or disable the submit button depending on the required fields
+    groupTitle && groupTitle.addEventListener("keyup", e => {
+
+      document.querySelectorAll('#creategroup-form input[type="submit"]').forEach(submit => {
+        submit.disabled = !e.target.value;
+      });
+    });
+
+    document.querySelectorAll("#groupMembershipFilter, #groupJoinableShowAllUsers")
+      .forEach(el => {
+
+        el.addEventListener("change", e => {
+
+          const gmJoinableShowAllUsersCheckbox = document.getElementById("groupJoinableShowAllUsers");
+          const groupParams = {
+            filterByGroupId: e.target.value,
+            groupId: document.getElementById("groupId")?.value,
+            currentTitle: groupTitle?.value,
+            currentDescription: document.getElementById("groupDescription")?.value,
+            currentShowAllUsers: gmJoinableShowAllUsersCheckbox?.checked ? true : false,
+          };
+          window.location = `group?${new URLSearchParams(groupParams)}`;
+        })
+      });
+
+    const groupJoinableSet = document.getElementById("groupJoinableSet");
+    const joinableOptionsDiv = document.getElementById("joinableOptionsDiv");
+    if (!groupJoinableSet?.value) {
+      joinableOptionsDiv && (joinableOptionsDiv.style.display = "none");
+    }
+
+    groupJoinableSet && groupJoinableSet.addEventListener("change", e => {
+      if (joinableOptionsDiv) {
+        joinableOptionsDiv.style.display = e.target.value === "" ? "none" : "block";
+      }
+    });
+
+    //Initialize the select2 component
+    var searchPlaceHolderText = /*[[#{groups.multiselect.search}]]*/;
+    $('#groupMembers').select2({
+      placeholder: searchPlaceHolderText,
+      allowClear: true
+    });
+
+  });
+  /*]]>*/
+</script>
+
+<script th:fragment="autoGroupsStep1Js" th:inline="javascript">
+  /*<![CDATA[*/
+  const allRolesCheckbox = document.getElementById("group-manager-select-all-roles");
+  allRolesCheckbox && allRolesCheckbox.addEventListener("click", e => {
+
+    document.querySelectorAll(".group-manager-role-checkbox")
+      .forEach(box => box.checked = e.target.checked);
+  });
+  /*]]>*/
+</script>
+
+<script th:fragment="autoGroupsStep2Js" th:inline="javascript">
+  /*<![CDATA[*/
+  const selectSectionDiv = document.getElementById("selectSectionDiv");
+  const useSectionsRadio = document.getElementById("sectionOptionUseSections");
+  useSectionsRadio && useSectionsRadio.addEventListener("change", e => {
+    selectSectionDiv && (selectSectionDiv.style.display = "block");
+  });
+
+  const dontUse = document.getElementById("sectionOptionDontUseSections");
+  dontUse && dontUse.addEventListener("change", e => {
+    selectSectionDiv && (selectSectionDiv.style.display = "none");
+  });
+
+  const allSectionsRadio = document.getElementById("group-manager-select-all-sections");
+  allSectionsRadio && allSectionsRadio.addEventListener("click", e => {
+
+    document.querySelectorAll(".group-manager-step2-checkbox")
+      .forEach(box => box.checked = e.target.checked);
+  });
+
+  const backButton = document.getElementById("autogroups-back-button");
+  backButton && backButton.addEventListener("click", () => {
+
+    document.getElementById("wizardAction").value = "back";
+    document.getElementById("autogroups-wizard-step2-form").submit();
+  });
+  /*]]>*/
+</script>
+
+<script th:fragment="autoGroupsStep3Js" th:inline="javascript">
+  /*<![CDATA[*/
+  const options = document.getElementById("mixtureStructureOptions");
+  const mixtureConfiguration = document.getElementById("mixtureConfiguration");
+  mixtureConfiguration && mixtureConfiguration.addEventListener("change", () => {
+    options && (options.style.display = "block");
+  });
+  const pureConfiguration = document.getElementById("pureConfiguration");
+  pureConfiguration && pureConfiguration.addEventListener("change", () => {
+    options && (options.style.display = "none");
+  });
+
+  const splitByGroups = document.getElementById("splitByGroups");
+  const splitByGroupsOptions = document.getElementById("splitByGroupsOptions");
+  const splitByUsers = document.getElementById("splitByUsers");
+  const splitByUsersOptions = document.getElementById("splitByUsersOptions");
+  const groupSelectedClass = 'optGroupSelectSelected';
+  const byUser = document.getElementById("splitByUser");
+  byUser && byUser.addEventListener("change", () => {
+
+    splitByGroups && splitByGroups.classList.remove(groupSelectedClass);
+    splitByUsers && splitByUsers.classList.add(groupSelectedClass);
+    splitByGroupsOptions && (splitByGroupsOptions.style.display = "none");
+    splitByUsersOptions && (splitByUsersOptions.style.display = "block");
+  });
+
+  const byGroup = document.getElementById("splitByGroup");
+  byGroup && byGroup.addEventListener("change", () => {
+
+    splitByUsers && splitByUsers.classList.remove(groupSelectedClass);
+    splitByGroups && splitByGroups.classList.add(groupSelectedClass);
+    splitByUsersOptions && (splitByUsersOptions.style.display = "none");
+    splitByGroupsOptions && (splitByGroupsOptions.style.display = "block");
+  });
+
+  const backButton = document.getElementById("autogroups-back-button");
+  backButton && backButton.addEventListener("click", () => {
+
+    document.getElementById('wizardAction').value = "back";
+    document.getElementById("autogroups-wizard-step3-form").submit();
+  });
+  /*]]>*/
+</script>
+
+<script th:fragment="autoGroupsStep4Js" th:inline="javascript">
+  /*<![CDATA[*/
+  document.querySelectorAll("#autogroups-back-button-top, #autogroups-back-button").forEach(el => {
+
+    el.addEventListener("click", () => {
+
+      document.getElementById("wizardAction").value = "back";
+      document.getElementById("autogroups-wizard-step4-form").submit();
+    });
+  });
+  /*]]>*/
+</script>
+
+</body>
+</html>
